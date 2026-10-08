@@ -1,6 +1,6 @@
 // RÉPARTI — service worker : rend l'application utilisable hors ligne une fois installée.
 // Change VERSION à chaque mise à jour pour que les appareils récupèrent la nouvelle version.
-const VERSION = 'reparti-v4';
+const VERSION = 'reparti-v6';
 const FILES = ['./', './index.html', './reparti.html', './config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
