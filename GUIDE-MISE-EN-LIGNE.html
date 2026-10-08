@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide de mise en ligne — RÉPARTI</title>
+<style>
+:root{--bg:#F4F5F0;--surface:#fff;--text:#16201B;--muted:#5F6A63;--border:#E1E5DD;--brand:#0E6B4F;--soft:#E2F0E8;--warn:#FBF0D9;--warn-ink:#7A4E00;--danger:#FDEBE7;--code:#EEF1EA}
+@media (prefers-color-scheme: dark){:root{--bg:#111613;--surface:#1A1F1C;--text:#ECF0ED;--muted:#A3ADA7;--border:#2C3430;--brand:#5CC79C;--soft:#173A2C;--warn:#3A2F17;--warn-ink:#E8B556;--danger:#3A1E1A;--code:#222925}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 80px}
+h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+h2{font-size:23px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+h3{font-size:17px;margin:22px 0 6px}
+.lead{color:var(--muted);margin:0 0 22px}
+section{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;margin:18px 0}
+.num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--brand);color:#fff;font-weight:800;font-size:17px;flex:none}
+@media (prefers-color-scheme: dark){.num{color:#08130E}}
+.sub{color:var(--muted);margin:0 0 10px}
+ol{padding-left:22px} ol li{margin:8px 0} ul{padding-left:22px}
+code,kbd{background:var(--code);border-radius:6px;padding:1px 6px;font-size:.92em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-word}
+kbd{border:1px solid var(--border);font-family:inherit;font-weight:600}
+pre{background:var(--code);border-radius:12px;padding:14px;overflow-x:auto;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.box{border-radius:12px;padding:12px 16px;margin:14px 0}
+.ok{background:var(--soft)} .warn{background:var(--warn)} .danger{background:var(--danger)}
+.box b:first-child{display:block;margin-bottom:2px}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:15px}
+td,th{border-bottom:1px solid var(--border);padding:8px 6px;text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.toc a{color:var(--brand);font-weight:600;text-decoration:none}
+.toc li{margin:4px 0}
+a{color:var(--brand)}
+.check{list-style:none;padding-left:0} .check li::before{content:"☐ ";font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>RÉPARTI — Guide de mise en ligne</h1>
+<p class="lead">Ce guide t'accompagne pas à pas pour rendre RÉPARTI disponible sur ton ordinateur, ta tablette et ton téléphone, avec un compte et une synchronisation automatique. Compte environ 30 minutes, une seule fois. Aucune ligne de code à écrire.</p>
+
+<section>
+<h2>🗺️ Vue d'ensemble</h2>
+<table>
+<tr><th>Service</th><th>À quoi il sert</th><th>Ce que tu y mets</th></tr>
+<tr><td><b>Supabase</b></td><td>Stocke les comptes et les données, envoie les codes de connexion</td><td>Le contenu du fichier <code>supabase-reparti.sql</code> + 2 modèles d'e-mail</td></tr>
+<tr><td><b>GitHub</b></td><td>Range les fichiers de l'application</td><td>Tous les fichiers du dossier <code>reparti-app</code> (et tes 2 informations Supabase dans <code>config.js</code>)</td></tr>
+<tr><td><b>Netlify</b></td><td>Met l'application en ligne à une adresse web, et la met à jour toute seule quand GitHub change</td><td>Rien à téléverser : tu le relies à GitHub</td></tr>
+</table>
+<p><b>Ordre à suivre :</b> ① Supabase → ② GitHub → ③ Netlify → ④ installation sur tes appareils.</p>
+<p><b>Contenu du dossier <code>reparti-app</code></b> (décompresse d'abord le fichier .zip : clic droit → <i>Extraire tout</i> sur Windows, double-clic sur Mac) :</p>
+<ul>
+<li><code>reparti.html</code> — l'application elle-même</li>
+<li><code>index.html</code> — la page d'accueil qui ouvre l'application</li>
+<li><code>config.js</code> — où tu colleras tes 2 informations Supabase</li>
+<li><code>manifest.webmanifest</code>, <code>sw.js</code>, dossier <code>icons</code> — ce qui rend l'application installable et utilisable hors connexion</li>
+<li><code>netlify.toml</code> — les réglages pour Netlify</li>
+<li><code>supabase-reparti.sql</code> — le script pour Supabase</li>
+<li><code>README.md</code>, <code>.nojekyll</code> — informations techniques (à mettre sur GitHub aussi, sans y toucher)</li>
+</ul>
+<div class="box warn"><b>Les 2 seules informations à copier d'un service à l'autre</b>Le <i>Project URL</i> et la clé <i>anon public</i> de Supabase. Garde un bloc-notes ouvert pour les coller au fur et à mesure.</div>
+</section>
+
+<section id="supabase">
+<h2><span class="num">1</span> Supabase — les comptes et les données</h2>
+<p class="sub">Durée : 10 minutes. Gratuit.</p>
+
+<h3>1.1 Créer ton compte</h3>
+<ol>
+<li>Va sur <a href="https://supabase.com">supabase.com</a> et clique sur <kbd>Start your project</kbd>.</li>
+<li>Choisis <kbd>Continue with GitHub</kbd> si tu as déjà un compte GitHub (le plus simple), sinon inscris-toi avec ton e-mail et confirme-le.</li>
+</ol>
+<div class="box ok"><b>Tu as déjà un projet Supabase pour Taskflow ?</b>Tu peux le réutiliser : ouvre-le et passe directement à l'étape 1.3. Les tables de RÉPARTI et de Taskflow ne se mélangent pas.</div>
+
+<h3>1.2 Créer le projet</h3>
+<ol>
+<li>Clique sur <kbd>New project</kbd> (choisis ton organisation si on te le demande).</li>
+<li><b>Project name</b> : <code>reparti</code></li>
+<li><b>Database Password</b> : clique sur <kbd>Generate a password</kbd> et <b>note-le</b> dans un endroit sûr (tu n'en auras pas besoin pour RÉPARTI, mais il ne faut pas le perdre).</li>
+<li><b>Region</b> : <i>West EU (Paris)</i> ou <i>Central EU (Frankfurt)</i> — les plus proches de l'Afrique de l'Ouest.</li>
+<li>Clique sur <kbd>Create new project</kbd> et patiente 1 à 2 minutes pendant la préparation.</li>
+</ol>
+
+<h3>1.3 Créer la table de RÉPARTI</h3>
+<ol>
+<li>Dans le menu de gauche, clique sur <kbd>SQL Editor</kbd> (icône <code>&gt;_</code>).</li>
+<li>Clique sur <kbd>+ New query</kbd> (ou <i>New SQL snippet</i>).</li>
+<li>Ouvre le fichier <code>supabase-reparti.sql</code> avec le Bloc-notes (clic droit → <i>Ouvrir avec</i> → <i>Bloc-notes</i> ; sur Mac : <i>TextEdit</i>), sélectionne tout (<kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>⌘</kbd>+<kbd>A</kbd>), copie, puis colle dans Supabase.</li>
+<li>Clique sur <kbd>Run</kbd> (en bas à droite). Résultat attendu : <i>« Success. No rows returned »</i>.</li>
+<li>Vérification : menu <kbd>Table Editor</kbd> → tu dois voir une table <code>reparti_data</code>.</li>
+</ol>
+<div class="box warn"><b>Si Supabase affiche un avertissement « destructive operation »</b>C'est normal (le script supprime puis recrée ses propres règles de sécurité). Clique sur <kbd>Run this query</kbd>.</div>
+
+<h3>1.4 Faire envoyer un code à 6 chiffres par e-mail</h3>
+<p>Par défaut Supabase envoie un lien ; RÉPARTI utilise un code, plus pratique sur une application installée.</p>
+<ol>
+<li>Menu <kbd>Authentication</kbd> → <kbd>Emails</kbd> (ou <i>Email Templates</i>), onglet <kbd>Templates</kbd>.</li>
+<li>Ouvre le modèle <b>Magic Link</b> :
+  <ul>
+  <li><b>Subject</b> : <code>Ton code RÉPARTI</code></li>
+  <li><b>Message body</b> : efface tout et colle :</li>
+  </ul>
+<pre>&lt;h2&gt;Ton code RÉPARTI&lt;/h2&gt;
+&lt;p&gt;Voici ton code de connexion :&lt;/p&gt;
+&lt;p style="font-size:28px;font-weight:bold;letter-spacing:4px"&gt;{{ .Token }}&lt;/p&gt;
+&lt;p&gt;Il est valable quelques minutes. Si tu n'as rien demandé, ignore cet e-mail.&lt;/p&gt;</pre>
+  Clique sur <kbd>Save changes</kbd>.</li>
+<li>Ouvre le modèle <b>Confirm signup</b> (envoyé lors de la toute première connexion) et fais <b>exactement la même chose</b> (même objet, même message), puis <kbd>Save changes</kbd>.</li>
+</ol>
+<div class="box ok"><b>Vérifie</b>que le message contient bien <code>{{ .Token }}</code> avec les doubles accolades : c'est ce qui sera remplacé par le code.</div>
+
+<h3>1.5 Récupérer tes 2 informations</h3>
+<ol>
+<li>Clique sur la roue dentée <kbd>Project Settings</kbd> (en bas du menu de gauche).</li>
+<li>Va dans <kbd>Data API</kbd> (ou <kbd>API</kbd>) : copie le <b>Project URL</b> (forme <code>https://abcdefghij.supabase.co</code>) dans ton bloc-notes.</li>
+<li>Va dans <kbd>API Keys</kbd> : copie la clé <b>anon public</b> (une longue suite qui commence souvent par <code>eyJ</code>). Si tu vois aussi une <i>publishable key</i> (<code>sb_publishable_…</code>), l'une ou l'autre fonctionne.</li>
+</ol>
+<div class="box danger"><b>⚠️ Ne copie jamais la clé « service_role » (ou « secret »)</b>Elle donne tous les droits sur ta base. Seule la clé <i>anon public</i> va dans RÉPARTI : elle est faite pour être visible, la sécurité est assurée par les règles créées à l'étape 1.3.</div>
+
+<h3>1.6 (Optionnel) Connexion par numéro de téléphone</h3>
+<p>L'envoi de SMS est payant et nécessite un fournisseur. À faire plus tard si tu le souhaites :</p>
+<ol>
+<li>Crée un compte chez <a href="https://www.twilio.com">Twilio</a> (ou MessageBird, Vonage) et achète un numéro d'envoi.</li>
+<li>Supabase → <kbd>Authentication</kbd> → <kbd>Sign In / Providers</kbd> → <kbd>Phone</kbd> → active-le, choisis le fournisseur et colle ses identifiants.</li>
+<li>Dans <code>config.js</code> sur GitHub (voir 2.4), remplace <code>phoneLogin: false</code> par <code>phoneLogin: true</code>.</li>
+</ol>
+</section>
+
+<section id="github">
+<h2><span class="num">2</span> GitHub — ranger les fichiers</h2>
+<p class="sub">Durée : 10 minutes. Gratuit.</p>
+
+<h3>2.1 Se connecter</h3>
+<p>Va sur <a href="https://github.com">github.com</a> et connecte-toi (tu as déjà le compte <code>adjaratou356-beep</code>).</p>
+
+<h3>2.2 Créer le dépôt</h3>
+<ol>
+<li>Va sur <a href="https://github.com/new">github.com/new</a>.</li>
+<li><b>Repository name</b> : <code>reparti</code></li>
+<li><b>Description</b> (facultatif) : <code>Ton argent. Tes règles. Chaque franc à sa place.</code></li>
+<li>Choisis <b>Public</b> ou <b>Private</b> : les deux fonctionnent avec Netlify. <i>Private</i> est conseillé si tu ne veux pas que le code soit visible. Tes données personnelles ne sont jamais dans GitHub de toute façon.</li>
+<li>Ne coche <b>rien</b> d'autre (pas de README, pas de .gitignore, pas de licence).</li>
+<li>Clique sur <kbd>Create repository</kbd>.</li>
+</ol>
+
+<h3>2.3 Téléverser les fichiers</h3>
+<ol>
+<li>Sur la page du dépôt vide, clique sur le lien <kbd>uploading an existing file</kbd> (dans la phrase « Get started by creating a new file or uploading an existing file »).</li>
+<li>Ouvre le dossier <code>reparti-app</code> sur ton ordinateur, <b>sélectionne tout son contenu</b> (<kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>⌘</kbd>+<kbd>A</kbd>) — y compris le dossier <code>icons</code> — et fais-le glisser dans la zone de dépôt de GitHub.
+  <br><small>Le fichier <code>.nojekyll</code> est invisible sur certains ordinateurs : ce n'est pas grave s'il manque.</small></li>
+<li>Attends que tous les fichiers apparaissent dans la liste (une dizaine), puis en bas clique sur <kbd>Commit changes</kbd>.</li>
+<li>Vérifie : la page du dépôt affiche <code>reparti.html</code>, <code>index.html</code>, <code>config.js</code>, le dossier <code>icons</code> (avec 4 images), etc.</li>
+</ol>
+<div class="box warn"><b>Le dossier icons n'apparaît pas ?</b>Certains navigateurs n'envoient pas les dossiers. Clique sur <kbd>Add file</kbd> → <kbd>Upload files</kbd>, puis glisse le <b>dossier</b> <code>icons</code> lui-même (pas son contenu) avec Chrome ou Edge, et <kbd>Commit changes</kbd>.</div>
+
+<h3>2.4 Coller tes informations Supabase dans config.js</h3>
+<ol>
+<li>Dans le dépôt, clique sur le fichier <code>config.js</code>.</li>
+<li>Clique sur l'icône crayon ✏️ (<i>Edit this file</i>) en haut à droite du fichier.</li>
+<li>Remplace <code>COLLE_ICI_TON_PROJECT_URL</code> par ton Project URL, et <code>COLLE_ICI_TA_CLE_ANON_PUBLIC</code> par ta clé anon. <b>Garde les guillemets</b>. Le résultat doit ressembler à :
+<pre>window.REPARTI_CONFIG = {
+  supabaseUrl: "https://abcdefghij.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi...",
+  phoneLogin: false
+};</pre></li>
+<li>Clique sur <kbd>Commit changes…</kbd> puis de nouveau <kbd>Commit changes</kbd> dans la fenêtre.</li>
+</ol>
+</section>
+
+<section id="netlify">
+<h2><span class="num">3</span> Netlify — mettre en ligne</h2>
+<p class="sub">Durée : 5 minutes. Gratuit.</p>
+
+<h3>3.1 Créer ton compte</h3>
+<ol>
+<li>Va sur <a href="https://app.netlify.com/signup">app.netlify.com/signup</a>.</li>
+<li>Clique sur <kbd>Sign up with GitHub</kbd> et autorise Netlify. Réponds aux quelques questions d'accueil (usage personnel).</li>
+</ol>
+
+<h3>3.2 Relier ton dépôt GitHub</h3>
+<ol>
+<li>Dans Netlify, clique sur <kbd>Add new project</kbd> (ou <i>Add new site</i>) → <kbd>Import an existing project</kbd>.</li>
+<li>Choisis <kbd>GitHub</kbd>. Si une fenêtre GitHub s'ouvre, clique sur <kbd>Authorize Netlify</kbd>, puis à la question « Where do you want to install Netlify? » choisis ton compte, sélectionne <b>Only select repositories</b> → <code>reparti</code> → <kbd>Install</kbd>.</li>
+<li>De retour dans Netlify, clique sur le dépôt <code>reparti</code>.</li>
+<li>Réglages de publication :
+  <ul>
+  <li><b>Branch to deploy</b> : <code>main</code></li>
+  <li><b>Base directory</b> : laisser vide</li>
+  <li><b>Build command</b> : laisser vide</li>
+  <li><b>Publish directory</b> : laisser vide (ou <code>.</code>)</li>
+  </ul></li>
+<li>Clique sur <kbd>Deploy reparti</kbd> (ou <i>Deploy site</i>). Au bout de 10 à 30 secondes, le statut passe à <b>Published</b>.</li>
+</ol>
+
+<h3>3.3 Choisir ton adresse</h3>
+<ol>
+<li>Netlify t'a donné une adresse au hasard (ex. <code>jolly-cat-123.netlify.app</code>).</li>
+<li>Va dans <kbd>Project configuration</kbd> (ou <i>Site configuration</i>) → <kbd>General</kbd> → <kbd>Change project name</kbd> (ou <i>Change site name</i>).</li>
+<li>Tape par exemple <code>reparti-adjaratou</code> et enregistre. Ton adresse devient <b><code>https://reparti-adjaratou.netlify.app</code></b>.</li>
+</ol>
+
+<h3>3.4 Tester</h3>
+<ol>
+<li>Ouvre ton adresse dans le navigateur.</li>
+<li>Sur l'écran de bienvenue, clique sur <kbd>Se connecter / créer un compte</kbd>, tape ton e-mail, puis <kbd>Recevoir mon code</kbd>.</li>
+<li>Ouvre ta boîte mail (regarde aussi les <b>spams</b>), recopie le code à 6 chiffres et valide.</li>
+<li>Termine l'accueil (revenus, comptes, lignes, objectifs, répartition). En bas du menu (sur ordinateur) ou dans <b>Paramètres</b>, tu dois lire <b>« ☁️ Synchronisé · ton-e-mail »</b>.</li>
+</ol>
+<div class="box ok"><b>Bonne nouvelle pour les mises à jour</b>Chaque fois que tu modifies un fichier sur GitHub, Netlify republie l'application automatiquement en moins d'une minute.</div>
+</section>
+
+<section id="installer">
+<h2><span class="num">4</span> Installer RÉPARTI sur tes appareils</h2>
+<p class="sub">À faire sur chaque appareil, avec ton adresse Netlify. Puis connecte-toi avec le <b>même e-mail</b> : tes données apparaissent automatiquement.</p>
+<table>
+<tr><th>Appareil</th><th>Comment faire</th></tr>
+<tr><td>💻 Ordinateur<br><small>Chrome ou Edge</small></td><td>Ouvre l'adresse → clique sur l'icône <b>Installer</b> (écran avec une flèche ⬇️) à droite de la barre d'adresse, ou menu <b>⋮ → Installer RÉPARTI</b> (Edge : <b>… → Applications → Installer</b>) → <kbd>Installer</kbd>. Sur Mac avec Safari : <b>Fichier → Ajouter au Dock</b>.</td></tr>
+<tr><td>📱 Android</td><td>Ouvre l'adresse dans <b>Chrome</b> → <b>⋮</b> en haut à droite → <b>Installer l'application</b> (ou <i>Ajouter à l'écran d'accueil</i>) → <kbd>Installer</kbd>.</td></tr>
+<tr><td>📱 iPhone</td><td>Ouvre l'adresse dans <b>Safari</b> → bouton <b>Partager</b> (carré avec une flèche ⬆️) → <b>Sur l'écran d'accueil</b> → <kbd>Ajouter</kbd>.</td></tr>
+<tr><td>📲 iPad</td><td>Comme l'iPhone (Safari → Partager → Sur l'écran d'accueil).</td></tr>
+<tr><td>📲 Tablette Android</td><td>Comme Android (Chrome → ⋮ → Installer l'application).</td></tr>
+</table>
+<p>Ensuite, ouvre RÉPARTI depuis son icône → <kbd>Se connecter / créer un compte</kbd> → même e-mail → code. C'est tout : chaque modification est envoyée à tes autres appareils (à l'ouverture de l'application, après chaque saisie et toutes les minutes).</p>
+</section>
+
+<section id="maj">
+<h2>🔄 Faire une mise à jour plus tard</h2>
+<ol>
+<li>Quand je t'envoie une nouvelle version de <code>reparti.html</code> (ou d'un autre fichier), va dans ton dépôt GitHub <code>reparti</code>.</li>
+<li><kbd>Add file</kbd> → <kbd>Upload files</kbd> → glisse le ou les nouveaux fichiers → <kbd>Commit changes</kbd>. GitHub remplace les anciens.</li>
+<li><b>Ne remplace pas <code>config.js</code></b> (sinon tu perds tes informations Supabase), sauf si je te le demande.</li>
+<li>Netlify republie tout seul. Sur tes appareils, ferme puis rouvre RÉPARTI (deux fois si besoin) pour recevoir la nouvelle version. Tes données ne sont pas touchées.</li>
+</ol>
+</section>
+
+<section id="aide">
+<h2>🛟 Si quelque chose ne marche pas</h2>
+<table>
+<tr><th>Ce que tu vois</th><th>Solution</th></tr>
+<tr><td>Le bouton « Se connecter » n'apparaît pas</td><td><code>config.js</code> n'est pas rempli ou mal rempli : vérifie les guillemets et qu'il ne reste pas <code>COLLE_ICI</code>. Attends 1 minute puis recharge la page.</td></tr>
+<tr><td>Le code n'arrive pas</td><td>Regarde dans les spams. L'offre gratuite de Supabase limite le nombre d'e-mails par heure : patiente quelques minutes et redemande un code. Pour beaucoup d'utilisateurs, il faudra brancher un service d'envoi (ex. Resend) dans <i>Authentication → Emails → SMTP Settings</i>.</td></tr>
+<tr><td>L'e-mail contient un lien mais pas de code</td><td>Refais l'étape 1.4 : le message doit contenir <code>{{ .Token }}</code>, dans <b>Magic Link</b> et dans <b>Confirm signup</b>.</td></tr>
+<tr><td>« Code incorrect ou expiré »</td><td>Utilise le dernier code reçu, rapidement après l'avoir demandé.</td></tr>
+<tr><td>« ⚠️ Synchronisation en attente »</td><td>Vérifie que le script de l'étape 1.3 a bien été exécuté (table <code>reparti_data</code> présente). Vérifie ta connexion internet.</td></tr>
+<tr><td>Supabase dit « Project paused »</td><td>Un projet gratuit se met en pause après 7 jours sans utilisation : ouvre le projet dans Supabase et clique sur <kbd>Restore project</kbd>. Avec un usage régulier, ça n'arrive pas.</td></tr>
+<tr><td>Pas de bouton « Installer » sur l'ordinateur</td><td>Utilise Chrome ou Edge (pas Firefox), et l'adresse Netlify en <code>https://</code>. L'application est peut-être déjà installée.</td></tr>
+<tr><td>Netlify affiche « Page not found »</td><td>Vérifie que <code>index.html</code> et <code>reparti.html</code> sont à la racine du dépôt GitHub (pas dans un sous-dossier). Sinon, déplace-les ou mets ce sous-dossier dans <i>Publish directory</i>.</td></tr>
+</table>
+</section>
+
+<section>
+<h2>✅ Récapitulatif</h2>
+<ul class="check">
+<li>Supabase : projet créé, script <code>supabase-reparti.sql</code> exécuté</li>
+<li>Supabase : modèles <i>Magic Link</i> et <i>Confirm signup</i> avec <code>{{ .Token }}</code></li>
+<li>Project URL et clé anon public copiés</li>
+<li>GitHub : dépôt <code>reparti</code> créé et fichiers téléversés</li>
+<li>GitHub : <code>config.js</code> rempli</li>
+<li>Netlify : relié au dépôt, publié, adresse renommée</li>
+<li>Test : connexion par code réussie, « ☁️ Synchronisé » affiché</li>
+<li>Application installée sur l'ordinateur, la tablette et le téléphone</li>
+</ul>
+</section>
+</main>
+</body>
+</html>
