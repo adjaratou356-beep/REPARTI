@@ -32,6 +32,7 @@
   --info:#7FB2EE; --info-soft:#1A2A3D; --track:#2A322E; --shadow:0 1px 2px rgba(0,0,0,.3);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
 body.noscroll{overflow:hidden}
@@ -168,6 +169,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0
 .budget-name{display:flex;align-items:center;gap:10px;min-width:150px}
 .budget-name .ic{font-size:17px}
 .mini-bar{width:110px}
+.txtable td{vertical-align:middle}
+.tx-date{white-space:nowrap;width:72px}
+.tx-date b{font-size:17px}
+.tx-motif{display:flex;align-items:center;gap:10px;min-width:0}
+.tx-ic{width:34px;height:34px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;flex:none}
+.m-only{display:none}
 
 /* Goal & debt cards */
 .gcard .top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
@@ -269,6 +276,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0
   .opt .bal{width:120px}
   .hbar{grid-template-columns:96px 1fr auto}
   .mini-bar{width:70px}
+  .d-only{display:none}
+  .m-only{display:inline}
+  .tx-ic{display:none}
+  .txtable td,.txtable th{padding:9px 3px}
+  .tx-date{width:44px}
+  .tx-date b{font-size:15px}
+  .txtable td:last-child{width:32px}
+  .txtable td:last-child .icon-btn{display:block;width:30px;height:30px}
+  .txtable .num b{font-size:13.5px}
+  .txtable .tx-motif b{word-break:break-word}
   .alloc-table .ain{width:105px}
   .alloc-table .pin{width:58px}
   h1{font-size:21px}
@@ -436,7 +453,7 @@ function refreshSync() { document.querySelectorAll('[data-sync]').forEach(el => 
 // les règles de sécurité de la table (voir supabase-reparti.sql) empêchent chacun de lire les données des autres.
 // Les valeurs se règlent dans config.js (fichier à côté de reparti.html), sans toucher à ce fichier.
 const CONFIG = Object.assign({ supabaseUrl: '', supabaseAnonKey: '', phoneLogin: false }, window.REPARTI_CONFIG || {});
-CONFIG.supabaseUrl = String(CONFIG.supabaseUrl || '').trim(); CONFIG.supabaseAnonKey = String(CONFIG.supabaseAnonKey || '').trim();
+CONFIG.supabaseUrl = String(CONFIG.supabaseUrl || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, ''); // accepte aussi une adresse copiée avec /rest/v1/ CONFIG.supabaseAnonKey = String(CONFIG.supabaseAnonKey || '').trim();
 if (/COLLE|xxxx/i.test(CONFIG.supabaseUrl + CONFIG.supabaseAnonKey)) { CONFIG.supabaseUrl = ''; CONFIG.supabaseAnonKey = ''; }
 const SB_KEY = 'reparti.session.v1';
 const SB = { session: null, status: 'ok', timer: null, busy: false, lastPull: 0, again: false };
@@ -464,12 +481,19 @@ function sbIdent(v) {
   if (!p.startsWith('+') && /^\d{9}$/.test(p)) p = '+221' + p; // numéro sénégalais sans indicatif
   return /^\+\d{8,15}$/.test(p) ? { phone: p } : null;
 }
-function sbErr(e) {
-  if (!e || e.status === undefined) return "Pas de connexion internet. Réessaie dans un instant.";
-  if (e.status === 429) return 'Trop de demandes. Patiente quelques minutes puis réessaie.';
-  if (/expired|invalid/i.test(e.message || '')) return 'Code incorrect ou expiré. Demande un nouveau code.';
-  return e.message || 'Erreur inconnue';
+function sbErr(e, step) {
+  if (!e || e.status === undefined) return "Impossible de joindre Supabase : vérifie ta connexion internet et l'adresse supabaseUrl dans config.js.";
+  const m = String(e.message || ''); const raw = m ? ` (détail : ${m})` : ` (code ${e.status})`;
+  if (e.status === 429 || /security purposes|rate limit/i.test(m)) return 'Trop de demandes rapprochées. Patiente 1 minute puis réessaie.' + raw;
+  if (/api key|apikey|jwt/i.test(m) || (e.status === 401 && step === 'send')) return 'La clé supabaseAnonKey dans config.js est incorrecte : recopie la clé « anon public » de Supabase.' + raw;
+  if (e.status === 404) return "L'adresse supabaseUrl dans config.js est incorrecte : recopie le « Project URL » de Supabase." + raw;
+  if (/sending|smtp|mail/i.test(m) && step === 'send') return "Supabase n'arrive pas à envoyer l'e-mail : vérifie les réglages SMTP (Gmail, mot de passe d'application) dans Supabase." + raw;
+  if (/signups? not allowed|disabled/i.test(m)) return "Les inscriptions sont désactivées dans Supabase : Authentication → Sign In / Providers → active « Allow new users to sign up » et le fournisseur Email." + raw;
+  if (step === 'verify' && /expired|invalid|otp|token/i.test(m)) return 'Code incorrect ou expiré. Utilise le DERNIER code reçu (chaque nouvel envoi annule le précédent).' + raw;
+  return 'Erreur' + raw;
 }
+// Affiche l'erreur dans la fenêtre (reste visible, contrairement à un toast)
+function sbShowErr(msg) { const f = $('#mform'); if (!f) return toast('❌ ' + esc(msg)); let el = f.querySelector('.sb-err'); if (!el) { el = document.createElement('div'); el.className = 'hint warn sb-err'; f.querySelector('.mf').before(el); } el.textContent = '❌ ' + msg; }
 const sbWho = () => SB.session ? (SB.session.user.email || SB.session.user.phone) : '';
 const sbRowPath = () => '/rest/v1/reparti_data?user_id=eq.' + SB.session.user.id;
 async function sbGetRow() { const rows = await sbFetch(sbRowPath() + '&select=data,updated_at'); return rows && rows[0] ? rows[0] : null; }
@@ -521,27 +545,42 @@ function formLogin(step = 1, id = null) {
       async onSubmit(f, form) {
         const ident = sbIdent(f.ident); if (!ident || (ident.phone && !ph)) return toast(ph ? 'Adresse e-mail ou numéro invalide.' : 'Adresse e-mail invalide.');
         const b = form.querySelector('[type=submit]'); b.disabled = true; b.textContent = 'Envoi…';
-        try { await sbFetch('/auth/v1/otp', { method: 'POST', auth: false, body: Object.assign({ create_user: true }, ident) }); formLogin(2, ident); }
-        catch (e) { toast('❌ ' + sbErr(e)); b.disabled = false; b.textContent = 'Recevoir mon code'; }
+        try { await sbFetch('/auth/v1/otp' + sbRedirect(), { method: 'POST', auth: false, body: Object.assign({ create_user: true }, ident) }); formLogin(2, ident); }
+        catch (e) { sbShowErr(sbErr(e, 'send')); b.disabled = false; b.textContent = 'Recevoir mon code'; }
       }
     });
   } else {
     openModal(`${mh('Entre ton code')}<form id="mform">
-      <p class="small muted" style="margin-top:-6px">Code envoyé à <b>${esc(id.email || id.phone)}</b>${id.email ? ' (pense à regarder dans les spams)' : ''}.</p>
+      <p class="small muted" style="margin-top:-6px">Code envoyé à <b>${esc(id.email || id.phone)}</b>${id.email ? ' (pense à regarder dans les spams). Si l\'e-mail contient un <b>lien</b> au lieu d\'un code, clique simplement sur ce lien : il te connecte directement.' : ''}</p>
       <label class="fld"><span>Code reçu</span><input name="code" required autofocus inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" style="font-size:22px;letter-spacing:.3em;text-align:center"></label>
       <div class="small" style="display:flex;gap:16px;margin-bottom:6px"><button type="button" class="link" data-act="loginResend">Renvoyer le code</button><button type="button" class="link" data-act="login">Changer ${id.email ? "d'adresse" : 'de numéro'}</button></div>
       ${mf('Valider')}</form>`, {
       ident: id,
       async onSubmit(f, form) {
-        const code = String(f.code || '').replace(/\s/g, ''); if (!/^\d{4,10}$/.test(code)) return toast('Le code ne contient que des chiffres.');
+        const code = String(f.code || '').replace(/\D/g, ''); if (!/^\d{4,10}$/.test(code)) return toast('Le code ne contient que des chiffres.');
         const b = form.querySelector('[type=submit]'); b.disabled = true; b.textContent = 'Vérification…';
         try {
           sbSetSession(await sbFetch('/auth/v1/verify', { method: 'POST', auth: false, body: id.email ? { type: 'email', email: id.email, token: code } : { type: 'sms', phone: id.phone, token: code } }));
           closeModal(); await sbAfterLogin();
-        } catch (e) { toast('❌ ' + sbErr(e)); b.disabled = false; b.textContent = 'Valider'; }
+        } catch (e) { sbShowErr(sbErr(e, 'verify')); b.disabled = false; b.textContent = 'Valider'; }
       }
     });
   }
+}
+// Adresse où revient le lien de connexion reçu par e-mail (si l'e-mail contient un lien plutôt qu'un code)
+function sbRedirect() { return /^https?:$/.test(location.protocol) ? '?redirect_to=' + encodeURIComponent(location.origin + location.pathname) : ''; }
+// Connexion par lien : Supabase renvoie vers l'application avec #access_token=…&refresh_token=…
+async function sbFromHash() {
+  if (!sbEnabled() || !location.hash) return false;
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (!h.get('access_token') && !h.get('error_description')) return false;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (h.get('error_description')) { toast('❌ Lien de connexion expiré ou déjà utilisé : demande un nouveau code.'); return false; }
+  try {
+    const user = await sbFetch('/auth/v1/user', { auth: false, headers: { Authorization: 'Bearer ' + h.get('access_token') } });
+    sbSetSession({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token'), expires_in: +h.get('expires_in') || 3600, user });
+    await sbAfterLogin(); return true;
+  } catch (e) { toast('❌ ' + esc(sbErr(e, 'verify'))); return false; }
 }
 async function sbLogout() {
   if (!await uiDialog('Se déconnecter ?\nTes données restent en sécurité dans ton compte, et seront retirées de cet appareil.', false, 'Se déconnecter', 'Annuler')) return;
@@ -758,7 +797,7 @@ const NAV = [
 function sidebar() {
   return `<aside class="side"><div class="logo"><div class="logo-mark">R</div><div><b>RÉPARTI</b><span>Chaque franc à sa place</span></div></div>
   ${NAV.map(([r, ic, l]) => `<button class="nav-item ${ui.route === r ? 'on' : ''}" data-go="${r}"><span class="ic">${ic}</span>${l}</button>`).join('')}
-  <div class="spacer"></div><button class="nav-item" data-act="install" data-install hidden><span class="ic">⬇️</span>Installer l'application</button><div class="small faint" style="padding:0 10px" data-sync>${syncLabel()}</div><button class="btn primary" data-act="quick" style="margin:10px 6px">＋ Nouvelle opération</button></aside>`;
+  <div class="spacer"></div>${sbEnabled() && !SB.session ? `<button class="btn" data-act="login" style="margin:0 6px 8px">☁️ Se connecter / créer un compte</button>` : ''}<button class="nav-item" data-act="install" data-install hidden><span class="ic">⬇️</span>Installer l'application</button><div class="small faint" style="padding:0 10px" data-sync>${syncLabel()}</div><button class="btn primary" data-act="quick" style="margin:10px 6px">＋ Nouvelle opération</button></aside>`;
 }
 function bottomNav() {
   const b = (r, ic, l) => `<button class="${ui.route === r ? 'on' : ''}" data-go="${r}"><span class="ic">${ic}</span>${l}</button>`;
@@ -849,17 +888,30 @@ function pDashboard(C) {
 }
 
 function txMeta(t) {
-  const a = accById(t.accountId);
-  if (t.type === 'income') { const c = catById(t.catId); return { ic: c ? c.icon : '📥', title: t.label || (c ? c.name : 'Rentrée'), sub: (c ? c.name : '') + ' · ' + (a ? a.name : ''), sign: 1 }; }
-  if (t.type === 'expense') { if (t.goalId) { const g = goalById(t.goalId); return { ic: g ? g.icon || '🎯' : '🎯', title: t.label || (g ? g.name : 'Dépense'), sub: 'Objectif ' + (g ? g.name : '') + ' · ' + (a ? a.name : ''), sign: -1 }; } const c = catById(t.catId); return { ic: c ? c.icon : '📤', title: t.label || (c ? c.name : 'Dépense'), sub: (c ? c.name : 'Sans ligne') + ' · ' + (a ? a.name : ''), sign: -1 }; }
-  if (t.type === 'transfer') { const b = accById(t.toAccountId); return { ic: '⇄', title: t.label || 'Transfert', sub: (a ? a.name : '?') + ' → ' + (b ? b.name : '?'), sign: 0 }; }
-  if (t.type === 'debt') { const d = debtById(t.debtId); return { ic: '💳', title: t.label || 'Remboursement ' + (d ? d.label : ''), sub: 'Dette · ' + (a ? a.name : ''), sign: -1 }; }
-  if (t.type === 'adjust') return { ic: '🔧', title: t.label || 'Ajustement de solde', sub: a ? a.name : '', sign: Math.sign(num(t.amount)) };
-  return { ic: '•', title: t.label, sub: '', sign: 0 };
+  const a = accById(t.accountId); const an = a ? a.icon + ' ' + a.name : '—';
+  if (t.type === 'income') { const c = catById(t.catId); return { ic: c ? c.icon : '📥', title: t.label || (c ? c.name : 'Rentrée'), sub: (c ? c.name : '') + ' · ' + (a ? a.name : ''), sign: 1, cat: c ? c.name : 'Rentrée', acc: an }; }
+  if (t.type === 'expense') { if (t.goalId) { const g = goalById(t.goalId); return { ic: g ? g.icon || '🎯' : '🎯', title: t.label || (g ? g.name : 'Dépense'), sub: 'Objectif ' + (g ? g.name : '') + ' · ' + (a ? a.name : ''), sign: -1, cat: 'Objectif ' + (g ? g.name : ''), acc: an }; } const c = catById(t.catId); return { ic: c ? c.icon : '📤', title: t.label || (c ? c.name : 'Dépense'), sub: (c ? c.name : 'Sans ligne') + ' · ' + (a ? a.name : ''), sign: -1, cat: c ? c.name : 'Sans ligne', acc: an }; }
+  if (t.type === 'transfer') { const b = accById(t.toAccountId); return { ic: '⇄', title: t.label || 'Transfert', sub: (a ? a.name : '?') + ' → ' + (b ? b.name : '?'), sign: 0, cat: 'Transfert', acc: (a ? a.name : '?') + ' → ' + (b ? b.name : '?') }; }
+  if (t.type === 'debt') { const d = debtById(t.debtId); return { ic: '💳', title: t.label || 'Remboursement ' + (d ? d.label : ''), sub: 'Dette · ' + (a ? a.name : ''), sign: -1, cat: 'Dette ' + (d ? d.label : ''), acc: an }; }
+  if (t.type === 'adjust') return { ic: '🔧', title: t.label || 'Ajustement de solde', sub: a ? a.name : '', sign: Math.sign(num(t.amount)), cat: 'Ajustement', acc: an };
+  return { ic: '•', title: t.label, sub: '', sign: 0, cat: '', acc: an };
 }
 function txRow(t, actions) {
   const x = txMeta(t); const a = Math.abs(num(t.amount));
-  return `<div class="li"><div class="ic">${esc(x.ic)}</div><div class="main-t"><b>${esc(x.title)}</b><span>${esc(x.sub)}${actions ? '' : ' · ' + fmtDate(t.date).replace(/ \d{4}$/, '')}</span></div><div class="amt num ${x.sign > 0 ? 'pos' : ''}">${x.sign > 0 ? '+' : x.sign < 0 ? '−' : ''}${fmt(a)}</div>${actions ? `<button class="icon-btn no-print" data-act="txEdit" data-id="${t.id}" title="Modifier">✏️</button><button class="icon-btn no-print" data-act="txDel" data-id="${t.id}" title="Supprimer">🗑️</button>` : ''}</div>`;
+  return `<div class="li"><div class="ic">${esc(x.ic)}</div><div class="main-t"><b>${esc(x.title)}</b><span>${fmtDate(t.date).replace(/ \d{4}$/, '')} · ${esc(x.sub)}</span></div><div class="amt num ${x.sign > 0 ? 'pos' : ''}">${x.sign > 0 ? '+' : x.sign < 0 ? '−' : ''}${fmt(a)}</div>${actions ? `<button class="icon-btn no-print" data-act="txEdit" data-id="${t.id}" title="Modifier">✏️</button><button class="icon-btn no-print" data-act="txDel" data-id="${t.id}" title="Supprimer">🗑️</button>` : ''}</div>`;
+}
+
+// Tableau des opérations : date, motif, catégorie, compte, montant
+function txTable(list) {
+  const TYPE = { income: 'Revenu', expense: 'Dépense', transfer: 'Transfert', debt: 'Dette', adjust: 'Ajustement' };
+  return `<div class="tbl-wrap"><table class="tbl txtable"><thead><tr><th>Date</th><th>Motif</th><th class="d-only">Catégorie</th><th class="d-only">Compte</th><th class="r">Montant</th><th class="no-print"></th></tr></thead><tbody>
+  ${list.map(t => { const x = txMeta(t); const a = Math.abs(num(t.amount)); const d = new Date(t.date + 'T00:00:00');
+    return `<tr><td class="tx-date"><b>${d.getDate()}</b> <span>${cap(d.toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''))}</span><div class="small faint">${cap(d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', ''))}</div></td>
+    <td><div class="tx-motif"><span class="tx-ic">${esc(x.ic)}</span><div><b>${t.label ? esc(t.label) : `<i class="faint">${esc(x.title)}</i>`}</b><div class="small faint">${TYPE[t.type] || ''}<span class="m-only"> · ${esc(x.cat)} · ${esc(x.acc)}</span></div></div></div></td>
+    <td class="d-only">${esc(x.cat)}</td><td class="d-only">${esc(x.acc)}</td>
+    <td class="r num"><b class="${x.sign > 0 ? 'pos' : ''}">${x.sign > 0 ? '+' : x.sign < 0 ? '−' : ''}${fmt(a)}</b></td>
+    <td class="r no-print" style="white-space:nowrap"><button class="icon-btn" data-act="txEdit" data-id="${t.id}" title="Modifier">✏️</button><button class="icon-btn" data-act="txDel" data-id="${t.id}" title="Supprimer">🗑️</button></td></tr>`; }).join('')}
+  </tbody></table></div>`;
 }
 
 function pBudget(C) {
@@ -945,7 +997,7 @@ function pTransactions(C) {
     ${f === 'alloc' ? `<p class="small muted">Chaque répartition déplace de l'argent « non affecté » vers une enveloppe, un objectif ou une dette (sans toucher aux comptes).</p>
       <div class="list">${allocs.map(x => `<div class="li"><div class="ic">${num(x.amount) >= 0 ? '➡️' : '⬅️'}</div><div class="main-t"><b>${esc(targetLabel(x.t, x.id))}</b><span>${fmtDate(x.date)}${x.note ? ' · ' + esc(x.note) : ''}${x.txId ? ' · rentrée' : ''}</span></div><div class="amt num">${fmtS(num(x.amount))}</div><button class="icon-btn" data-act="allocDel" data-id="${x.id}" title="Annuler">🗑️</button></div>`).join('') || empty('📐', 'Aucune répartition ce mois-ci.')}</div>`
     : `<div class="small muted" style="margin:8px 0">${list.length} opération(s) · Entrées <b class="pos num">${fmt(tin)}</b> · Sorties <b class="num">${fmt(tout)}</b></div>
-      ${days.map(d => `<div class="day-h">${fmtDay(d)}</div><div class="list">${list.filter(t => t.date === d).map(t => txRow(t, true)).join('')}</div>`).join('') || empty('🧾', 'Aucune opération pour ce mois.', '<button class="btn primary" data-act="quick">＋ Nouvelle opération</button>')}`}
+      ${list.length ? txTable(list) : empty('🧾', 'Aucune opération pour ce mois.', '<button class="btn primary" data-act="quick">＋ Nouvelle opération</button>')}`}
   </div>`;
 }
 
@@ -1049,6 +1101,7 @@ function pParametres(C) {
       <label class="fld"><span>Apparence</span><select data-bind="theme"><option value="">Automatique</option><option value="light" ${S.theme === 'light' ? 'selected' : ''}>Clair</option><option value="dark" ${S.theme === 'dark' ? 'selected' : ''}>Sombre</option></select></label></div>
     <div class="card"><h2 style="margin-bottom:6px">💾 Mes données</h2>
       <p class="small" style="margin-top:0;font-weight:650" data-sync>${syncLabel()}</p>
+      ${!sbEnabled() && !CLOUD.ready && window.top === window.self && /^https?:$/.test(location.protocol) ? `<div class="alert warn"><span class="a-ic">⚠️</span><div class="a-body">Connexion par e-mail non configurée : ${window.REPARTI_CONFIG ? 'le fichier <b>config.js</b> est trouvé mais incomplet (adresse ou clé manquante).' : 'le fichier <b>config.js</b> est introuvable à côté de reparti.html.'}</div></div>` : ''}
       ${sbEnabled() ? (SB.session ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn sm" data-act="syncNow">🔄 Synchroniser maintenant</button><button class="btn sm" data-act="logout">Se déconnecter</button></div>` : `<div style="margin-bottom:12px"><button class="btn primary sm" data-act="login">☁️ Se connecter / créer un compte</button></div>`) : ''}
       <p class="small muted" style="margin-top:0">${sbEnabled() && SB.session ? "Connecte-toi avec le même compte sur ton ordinateur, ta tablette et ton téléphone : chaque modification est envoyée automatiquement. L'export reste utile comme copie de sécurité." : CLOUD.ready ? "Tu retrouves tes données sur tous tes appareils en ouvrant ce lien avec ton compte. Elles sont privées : personne d'autre ne peut les voir." : 'Tes données restent dans ce navigateur. Exporte régulièrement une sauvegarde (fichier .json) pour la conserver ou la transférer sur un autre appareil.'}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="export">⬇️ Exporter une sauvegarde</button><button class="btn" data-act="import">⬆️ Restaurer</button><button class="btn" data-act="csv">📄 Export CSV (Excel)</button></div>
@@ -1089,12 +1142,17 @@ async function askNewCat(kind, sel) {
 }
 function needAccounts() { if (!activeAccounts().length) { toast("Ajoute d'abord un compte."); go('comptes'); return true; } return false; }
 
+// Motifs déjà utilisés (pour l'autocomplétion), du plus récent au plus ancien
+function motifList(type, id) {
+  const seen = []; S.tx.filter(t => t.type === type && t.label).sort((a, b) => b.date.localeCompare(a.date)).forEach(t => { if (!seen.includes(t.label) && seen.length < 40) seen.push(t.label); });
+  return `<datalist id="${id}">${seen.map(v => `<option value="${esc(v)}">`).join('')}</datalist>`;
+}
 function formIncome(tx) {
   if (needAccounts()) return;
   const t = tx || { amount: '', label: '', catId: (incCats()[0] || {}).id, accountId: (activeAccounts()[0] || {}).id, date: today() };
   openModal(`${mh(tx ? 'Modifier la rentrée' : '📥 Ajouter une rentrée d\'argent')}<form id="mform">
     <label class="fld"><span>Montant (${cur()})</span><input name="amount" inputmode="decimal" required autofocus value="${t.amount ? fmtN(num(t.amount)) : ''}" placeholder="1 000 000"></label>
-    <label class="fld"><span>Libellé</span><input name="label" value="${esc(t.label)}" placeholder="Salaire octobre"></label>
+    <label class="fld"><span>Motif</span><input name="label" value="${esc(t.label)}" required placeholder="Ex. Salaire octobre, Paiement client Diallo…" list="motifsIn" autocomplete="off">${motifList('income', 'motifsIn')}</label>
     <div class="row2"><label class="fld"><span>Catégorie</span><select name="catId" data-newcat="income">${catOptions('income', t.catId)}</select></label>
     <label class="fld"><span>Compte de réception</span><select name="accountId">${accountOptions(t.accountId)}</select></label></div>
     <label class="fld"><span>Date</span><input type="date" name="date" value="${t.date}" required></label>
@@ -1103,6 +1161,7 @@ function formIncome(tx) {
     onSubmit(f) {
       const amount = num(f.amount); if (amount <= 0) return toast('Indique un montant valide.');
       if (f.catId === '__new') return toast('Choisis une catégorie.');
+      if (!f.label.trim()) return toast('Indique le motif de cette rentrée.');
       if (tx) { Object.assign(tx, { amount, label: f.label.trim(), catId: f.catId, accountId: f.accountId, date: f.date }); return commit('Rentrée modifiée ✓'); }
       const n = { id: uid(), type: 'income', amount, label: f.label.trim(), catId: f.catId, accountId: f.accountId, date: f.date };
       S.tx.push(n); save();
@@ -1119,7 +1178,7 @@ function formExpense(tx, pre = {}) {
   const lineOpts = catOptions('expense', sel, true).replace('<option value="__new">', (S.goals.length ? `<optgroup label="Depuis un objectif d'épargne">${S.goals.map(g => `<option value="goal:${g.id}" ${sel === 'goal:' + g.id ? 'selected' : ''}>${esc((g.icon || '🎯') + ' ' + g.name)}</option>`).join('')}</optgroup>` : '') + '<option value="__new">');
   openModal(`${mh(tx ? 'Modifier la dépense' : '📤 Nouvelle dépense')}<form id="mform">
     <label class="fld"><span>Montant (${cur()})</span><input name="amount" inputmode="decimal" required autofocus value="${t.amount ? fmtN(num(t.amount)) : ''}" placeholder="15 000" data-envcheck></label>
-    <label class="fld"><span>Libellé</span><input name="label" value="${esc(t.label)}" placeholder="Restaurant avec des amis"></label>
+    <label class="fld"><span>Motif</span><input name="label" value="${esc(t.label)}" required placeholder="Ex. Courses Auchan, Taxi bureau, Facture Senelec…" list="motifsOut" autocomplete="off">${motifList('expense', 'motifsOut')}</label>
     <div class="row2"><label class="fld"><span>Ligne budgétaire</span><select name="line" data-newcat="expense" data-envcheck>${lineOpts}</select></label>
     <label class="fld"><span>Payé avec</span><select name="accountId">${accountOptions(t.accountId)}</select></label></div>
     <div class="hint" id="envHint"></div>
@@ -1129,6 +1188,7 @@ function formExpense(tx, pre = {}) {
     onSubmit(f) {
       const amount = num(f.amount); if (amount <= 0) return toast('Indique un montant valide.');
       if (f.line === '__new') return toast('Choisis une ligne.');
+      if (!f.label.trim()) return toast('Indique le motif de cette dépense.');
       const isGoal = f.line.startsWith('goal:');
       const data = { amount, label: f.label.trim(), catId: isGoal ? '' : f.line, goalId: isGoal ? f.line.slice(5) : '', accountId: f.accountId, date: f.date };
       if (tx) { Object.assign(tx, data); return commit('Dépense modifiée ✓'); }
@@ -1158,14 +1218,14 @@ function formTransfer(tx) {
     <div class="row2"><label class="fld"><span>De</span><select name="accountId">${accs.map(a => `<option value="${a.id}" ${a.id === t.accountId ? 'selected' : ''}>${esc(a.icon + ' ' + a.name)} — ${fmt(C.acc[a.id])}</option>`).join('')}</select></label>
     <label class="fld"><span>Vers</span><select name="toAccountId">${accs.map(a => `<option value="${a.id}" ${a.id === t.toAccountId ? 'selected' : ''}>${esc(a.icon + ' ' + a.name)} — ${fmt(C.acc[a.id])}</option>`).join('')}</select></label></div>
     <label class="fld"><span>Montant (${cur()})</span><input name="amount" inputmode="decimal" required autofocus value="${t.amount ? fmtN(num(t.amount)) : ''}"></label>
-    <div class="row2"><label class="fld"><span>Libellé (optionnel)</span><input name="label" value="${esc(t.label)}" placeholder="Rechargement Wave"></label>
+    <div class="row2"><label class="fld"><span>Motif</span><input name="label" value="${esc(t.label)}" placeholder="Ex. Rechargement Wave" list="motifsTr" autocomplete="off">${motifList('transfer', 'motifsTr')}</label>
     <label class="fld"><span>Date</span><input type="date" name="date" value="${t.date}"></label></div>
     <label class="fld"><span>Frais de transfert (optionnel)</span><input name="fee" inputmode="decimal" placeholder="0"><small>Les frais seront enregistrés comme une dépense « Frais bancaires ».</small></label>
     ${mf(tx ? 'Enregistrer' : 'Transférer')}</form>`, {
     onSubmit(f) {
       const amount = num(f.amount); if (amount <= 0) return toast('Indique un montant valide.');
       if (f.accountId === f.toAccountId) return toast('Choisis deux comptes différents.');
-      const data = { amount, label: f.label.trim(), accountId: f.accountId, toAccountId: f.toAccountId, date: f.date || today() };
+      const data = { amount, label: f.label.trim() || ('Transfert ' + accById(f.accountId).name + ' → ' + accById(f.toAccountId).name), accountId: f.accountId, toAccountId: f.toAccountId, date: f.date || today() };
       if (tx) Object.assign(tx, data); else S.tx.push(Object.assign({ id: uid(), type: 'transfer' }, data));
       const fee = num(f.fee);
       if (fee > 0) { let fc = S.categories.find(c => c.kind === 'expense' && c.name === 'Frais bancaires'); if (!fc) { fc = { id: uid(), kind: 'expense', name: 'Frais bancaires', icon: '🏦', group: 'Finance', mode: 'variable', amount: 0, pct: 0, recurrence: 'mensuelle', accountId: '', archived: false }; S.categories.push(fc); } S.tx.push({ id: uid(), type: 'expense', amount: fee, label: 'Frais de transfert', catId: fc.id, goalId: '', accountId: f.accountId, date: data.date }); }
@@ -1183,12 +1243,12 @@ function formDebtPay(debtId, tx) {
     <label class="fld"><span>Dette</span><select name="debtId">${debts.map(d => `<option value="${d.id}" ${d.id === t.debtId ? 'selected' : ''}>${esc(d.label)} — reste ${fmt(C.remaining[d.id])}</option>`).join('')}</select></label>
     <div class="row2"><label class="fld"><span>Montant (${cur()})</span><input name="amount" inputmode="decimal" required autofocus value="${fmtN(num(t.amount))}"></label>
     <label class="fld"><span>Depuis le compte</span><select name="accountId">${accountOptions(t.accountId)}</select></label></div>
-    <div class="row2"><label class="fld"><span>Date</span><input type="date" name="date" value="${t.date}"></label><label class="fld"><span>Note (optionnel)</span><input name="label" value="${esc(t.label)}"></label></div>
+    <div class="row2"><label class="fld"><span>Date</span><input type="date" name="date" value="${t.date}"></label><label class="fld"><span>Motif</span><input name="label" value="${esc(t.label)}" placeholder="Ex. Échéance octobre"></label></div>
     <p class="small muted">Si tu as provisionné de l'argent pour cette dette, il est utilisé en priorité. Sinon le paiement est pris sur ton argent non affecté.</p>
     ${mf(tx ? 'Enregistrer' : 'Rembourser')}</form>`, {
     onSubmit(f) {
       const amount = num(f.amount); if (amount <= 0) return toast('Indique un montant valide.');
-      const data = { amount, debtId: f.debtId, accountId: f.accountId, date: f.date || today(), label: f.label.trim() };
+      const data = { amount, debtId: f.debtId, accountId: f.accountId, date: f.date || today(), label: f.label.trim() || ('Remboursement ' + debtById(f.debtId).label) };
       if (tx) { Object.assign(tx, data); return commit('Remboursement modifié ✓'); }
       S.tx.push(Object.assign({ id: uid(), type: 'debt' }, data));
       const C2 = calc(); commit(C2.remaining[f.debtId] <= 0 ? '🎉 Dette soldée !' : `Remboursé ✓ · reste ${fmt(C2.remaining[f.debtId])}`);
@@ -1449,7 +1509,7 @@ async function exportJSON() { const ok = await download(`reparti-sauvegarde-${to
 async function exportCSV() {
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const typ = { income: 'Revenu', expense: 'Dépense', transfer: 'Transfert', debt: 'Remboursement dette', adjust: 'Ajustement' };
-  const lines = [['Date', 'Type', 'Libellé', 'Catégorie / destination', 'Compte', 'Compte destination', 'Montant'].map(q).join(';')];
+  const lines = [['Date', 'Type', 'Motif', 'Catégorie / destination', 'Compte', 'Compte destination', 'Montant'].map(q).join(';')];
   S.tx.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(t => { const x = txMeta(t); const sign = t.type === 'income' ? 1 : t.type === 'adjust' ? 1 : t.type === 'transfer' ? 1 : -1; lines.push([t.date, typ[t.type], t.label || x.title, x.sub.split(' · ')[0], (accById(t.accountId) || {}).name, (accById(t.toAccountId) || {}).name || '', String(sign * num(t.amount)).replace('.', ',')].map(q).join(';')); });
   if (await download(`reparti-transactions-${today()}.csv`, '\ufeff' + lines.join('\r\n'), 'text/csv;charset=utf-8')) toast('Export CSV téléchargé ✓');
 }
@@ -1655,7 +1715,7 @@ const ACT = {
     <button data-act="debtPay"><span class="q-ic">💳</span><b>Rembourser une dette</b><span>Échéance ou paiement libre</span></button>
     <button data-act="move"><span class="q-ic">🎯</span><b>Affecter de l'argent</b><span>Vers une enveloppe ou un objectif</span></button>
     <button data-act="distribute"><span class="q-ic">💸</span><b>Répartir le non affecté</b><span>Avec un modèle</span></button></div>`),
-  menu: () => openModal(`${mh('Menu')}<div class="list">${NAV.map(([r, ic, l]) => `<button class="nav-item ${ui.route === r ? 'on' : ''}" data-go="${r}"><span class="ic">${ic}</span>${l}</button>`).join('')}</div>`),
+  menu: () => openModal(`${mh('Menu')}${sbEnabled() && !SB.session ? '<button class="btn primary" data-act="login" style="width:100%;margin-bottom:10px">☁️ Se connecter / créer un compte</button>' : ''}<div class="list">${NAV.map(([r, ic, l]) => `<button class="nav-item ${ui.route === r ? 'on' : ''}" data-go="${r}"><span class="ic">${ic}</span>${l}</button>`).join('')}</div>`),
   income: () => formIncome(),
   expense: el => formExpense(null, { goalId: el.dataset.goal }),
   transfer: () => formTransfer(),
@@ -1718,7 +1778,7 @@ const ACT = {
   obAddAcc: () => { const n = ($('#obNewAcc').value || '').trim(); if (!n) return; OB.custom.push({ name: n, bal: '' }); renderOnboarding(); },
   obCustomDel: el => { OB.custom.splice(+el.dataset.i, 1); renderOnboarding(); },
   login: () => formLogin(1),
-  loginResend: async () => { const id = modalCtx && modalCtx.ident; if (!id) return; try { await sbFetch('/auth/v1/otp', { method: 'POST', auth: false, body: Object.assign({ create_user: true }, id) }); toast('Nouveau code envoyé ✓'); } catch (e) { toast('❌ ' + sbErr(e)); } },
+  loginResend: async () => { const id = modalCtx && modalCtx.ident; if (!id) return; try { await sbFetch('/auth/v1/otp' + sbRedirect(), { method: 'POST', auth: false, body: Object.assign({ create_user: true }, id) }); toast('Nouveau code envoyé ✓ — utilise ce nouveau code'); } catch (e) { sbShowErr(sbErr(e, 'send')); } },
   logout: () => sbLogout(),
   syncNow: () => { sbSync(); toast('Synchronisation…'); },
   obGoalAdd: () => { OB.goals.push({ id: uid(), name: '', icon: '🎯', target: '', months: 12 }); renderOnboarding(); const ins = document.querySelectorAll('[data-obgoal$=":name"]'); ins[ins.length - 1].focus(); },
@@ -1795,7 +1855,7 @@ ACT.install = async () => {
 
 render();
 initCloud();
-sbSync();
+sbFromHash().then(ok => { if (!ok) sbSync(); });
 </script>
 </body>
 </html>
